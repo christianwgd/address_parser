@@ -1,0 +1,6 @@
+# Test your FastAPI endpoints
+
+GET http://127.0.0.1:8000/parse-address/1803%20Mary%20Ellen%20Dr%20Columbia%20MO%2065202
+Accept: application/json
+
+###
