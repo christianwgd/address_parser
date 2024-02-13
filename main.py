@@ -27,9 +27,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-api_keys = [
-    "my_api_key"
-]
+with open('api-keys.json', 'r', encoding='utf') as api_keys_file:
+    api_keys_data = json.load(api_keys_file)
+    api_keys = [item for item in api_keys_data['api_keys']]
+    api_keys_file.close()
 
 
 api_key_header = APIKeyHeader(name="X-API-Key")
