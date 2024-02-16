@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
 
 
 routes_with_custom_exception = ['/']
@@ -15,8 +16,12 @@ routes_with_custom_exception = ['/']
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # app.state.address_parser = AddressParser(model_type="FastText", device="cpu")
-    app.state.address_parser = AddressParser(model_type="BPEmb", device="cpu")
+    with open('config.json', 'r', encoding='utf') as config_file:
+        config_data = json.load(config_file)
+        app.state.api_keys = [item for item in config_data['api_keys']]
+        app.state.model = config_data['model']
+        config_file.close()
+    app.state.address_parser = AddressParser(model_type=app.state.model, device="cpu")
     yield
 
 
@@ -37,17 +42,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-with open('api-keys.json', 'r', encoding='utf') as api_keys_file:
-    api_keys_data = json.load(api_keys_file)
-    api_keys = [item for item in api_keys_data['api_keys']]
-    api_keys_file.close()
-
-
 api_key_header = APIKeyHeader(name="X-API-Key")
 
 
 def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
-    if api_key_header in api_keys:
+    if api_key_header in app.state.api_keys:
         return api_key_header
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,10 +54,13 @@ def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
     )
 
 
-@app.get("/parse-address/")
-async def parse_address(request: Request, api_key: str = Security(get_api_key)):
-    request_json = await request.json()
-    address = request_json['address']
+class AddressData(BaseModel):
+    address: str
+
+
+@app.post("/parse-address/")
+async def parse_address(request: Request, address_data: AddressData, api_key: str = Security(get_api_key)):
+    address = address_data.address
     address = address_cleaner.coma_cleaning(address)
     address = address_cleaner.lower_cleaning(address)
     address = address_cleaner.trailing_whitespace_cleaning(address)
