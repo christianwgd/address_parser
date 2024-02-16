@@ -15,7 +15,8 @@ routes_with_custom_exception = ['/']
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.address_parser = AddressParser(model_type="FastText", device="cpu")
+    # app.state.address_parser = AddressParser(model_type="FastText", device="cpu")
+    app.state.address_parser = AddressParser(model_type="BPEmb", device="cpu")
     yield
 
 
