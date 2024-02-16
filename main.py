@@ -1,4 +1,5 @@
 import json
+from contextlib import asynccontextmanager
 
 from deepparse.pre_processing import address_cleaner
 from fastapi import FastAPI, HTTPException, Security, Request, status
@@ -8,10 +9,18 @@ from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-app = FastAPI()
-
 
 routes_with_custom_exception = ['/']
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.address_parser = AddressParser(model_type="FastText", device="cpu")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -46,16 +55,15 @@ def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
 
 
 @app.get("/parse-address/")
-async def say_hello(request: Request, api_key: str = Security(get_api_key)):
+async def parse_address(request: Request, api_key: str = Security(get_api_key)):
     request_json = await request.json()
     address = request_json['address']
-    address_parser = AddressParser(model_type="lightest", device="cpu")
     address = address_cleaner.coma_cleaning(address)
     address = address_cleaner.lower_cleaning(address)
     address = address_cleaner.trailing_whitespace_cleaning(address)
     address = address_cleaner.double_whitespaces_cleaning(address)
     address = address_cleaner.hyphen_cleaning(address)
-    adr_dict = address_parser(address).to_dict()
+    adr_dict = request.app.state.address_parser(address).to_dict()
 
     title_parts = ['StreetName', 'Municipality']
     for part in title_parts:
